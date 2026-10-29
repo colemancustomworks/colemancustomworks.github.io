@@ -35,7 +35,7 @@ form.app button{margin-top:28px;background:#f5f5f7;color:#0e0e10;border:0;border
 <script>
 fetch('updates.json?'+Date.now()).then(r=>r.json()).then(list=>{const box=document.getElementById('posts');
 if(!list.length){box.innerHTML='<p style="color:#a1a1a6">First update coming soon.</p>';return}
-list.sort((a,b)=>b.date.localeCompare(a.date));
+list.sort((a,b)=>(b.time||b.date).localeCompare(a.time||a.date));
 for(const p of list){const el=document.createElement('article');el.className='post';
 const d=new Date(p.date+'T12:00:00');let h='<div class="meta">'+d.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})+(p.tag?'<span class="tag">'+p.tag+'</span>':'')+'</div>';
 if(p.text)h+='<p></p>';(p.images||[]).forEach(i=>h+='<img loading="lazy" alt="" src="'+i+'">');(p.videos||[]).forEach(v=>h+='<video controls playsinline preload="metadata" src="'+v+'"></video>');

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en"><head><meta name="robots" content="noindex, nofollow"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Post an Update | Coleman Customworks</title><link rel="icon" href="images/ccw-logo.png">
+<style>
+body{margin:0;background:#0e0e10;color:#f5f5f7;font-family:-apple-system,system-ui,sans-serif}
+.w{max-width:560px;margin:0 auto;padding:28px 18px 60px}h1{font-weight:500;font-size:30px;margin:0 0 6px}.sub{color:#a1a1a6;margin:0 0 22px;font-size:14px}
+label{display:block;margin:16px 0 6px;font-size:14px;color:#a1a1a6}
+textarea,input[type=text],input[type=password],select{width:100%;box-sizing:border-box;background:#141417;color:#f5f5f7;border:1px solid #f5f5f744;border-radius:14px;padding:12px 14px;font:inherit;font-size:16px}
+textarea{min-height:140px}
+button{background:#f5f5f7;color:#0e0e10;border:0;border-radius:24px;padding:13px 24px;font:inherit;font-weight:600;cursor:pointer;margin-top:20px}
+button.ghost{background:none;color:#f5f5f7;border:1px solid #f5f5f766;padding:8px 14px;font-weight:400;font-size:13px;margin-top:8px}
+#msg{margin-top:14px;font-size:14px;min-height:20px}.thumbs{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.thumbs img{width:76px;height:76px;object-fit:cover;border-radius:10px}
+.post{border:1px solid #f5f5f71f;border-radius:14px;padding:12px;margin-top:10px;font-size:14px}.post .m{color:#a1a1a6;font-size:12px;margin-bottom:4px}
+a{color:#f5f5f7}
+</style></head><body><div class="w">
+<div id="login" hidden><h1>Owner sign in</h1><p class="sub">Enter your posting key once. It stays on this device only.</p>
+<label>Posting key</label><input type="password" id="tok" autocomplete="current-password"><button id="save">Sign in</button><div id="lmsg" style="margin-top:12px;font-size:14px"></div></div>
+<div id="app" hidden><h1>Post an update</h1><p class="sub">Goes live on your <a href="updates.html">Updates page</a> in about a minute.</p>
+<label>What's new?</label><textarea id="txt" placeholder="A thought, an announcement, or a note about the job…"></textarea>
+<label>Tag (optional)</label><select id="tag"><option value="">None</option><option>Job pics</option><option>Announcement</option><option>Thoughts</option><option>Before &amp; after</option></select>
+<label>Photos or video (optional)</label><input type="file" id="files" accept="image/*,video/*" multiple><div class="thumbs" id="th"></div>
+<button id="post">Post</button><div id="msg"></div>
+<h2 style="font-weight:500;font-size:20px;margin:36px 0 4px">Recent posts</h2><div id="list"></div>
+<button class="ghost" id="out">Sign out on this device</button></div>
+</div>
+<script>
+const R='colemancustomworks/colemancustomworks.github.io',API='https://api.github.com/repos/'+R+'/contents/',$=id=>document.getElementById(id);
+let T=localStorage.getItem('ccw_key');
+const H=()=>({Authorization:'Bearer '+T,Accept:'application/vnd.github+json'});
+const b64=s=>btoa(unescape(encodeURIComponent(s))),unb64=s=>decodeURIComponent(escape(atob(s.replace(/\n/g,''))));
+async function gh(path,opt){const r=await fetch(API+path,Object.assign({headers:H()},opt));if(!r.ok)throw new Error(r.status);return r.json();}
+async function getJ(){const f=await gh('updates.json?ref=main&t='+Date.now());return{sha:f.sha,list:JSON.parse(unb64(f.content)||'[]')};}
+async function putJ(list,sha,m){return gh('updates.json',{method:'PUT',body:JSON.stringify({message:m,content:b64(JSON.stringify(list,null,1)+'\n'),sha,branch:'main'})});}
+function fileB64(blob){return new Promise(res=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.readAsDataURL(blob);});}
+function shrink(file){return new Promise(res=>{const img=new Image();img.onload=()=>{const k=Math.min(1,1600/Math.max(img.width,img.height)),c=document.createElement('canvas');c.width=img.width*k;c.height=img.height*k;c.getContext('2d').drawImage(img,0,0,c.width,c.height);c.toBlob(res,'image/jpeg',.85);};img.src=URL.createObjectURL(file);});}
+async function check(){try{const r=await fetch('https://api.github.com/repos/'+R,{headers:H()});const j=await r.json();return r.ok&&j.permissions&&j.permissions.push;}catch(e){return false}}
+async function start(){if(T&&await check()){$('app').hidden=false;$('login').hidden=true;list();}else{$('login').hidden=false;$('app').hidden=true;}}
+$('save').onclick=async()=>{T=$('tok').value.trim();$('lmsg').textContent='Checking…';if(await check()){localStorage.setItem('ccw_key',T);start();}else{$('lmsg').textContent='That key did not work.';T=null;}};
+$('out').onclick=()=>{localStorage.removeItem('ccw_key');T=null;start();};
+$('files').onchange=()=>{$('th').innerHTML='';[...$('files').files].forEach(f=>{if(f.type.startsWith('image/')){const i=document.createElement('img');i.src=URL.createObjectURL(f);$('th').appendChild(i);}else{const s=document.createElement('span');s.textContent='🎬 '+f.name;$('th').appendChild(s);}});};
+$('post').onclick=async()=>{const text=$('txt').value.trim(),files=[...$('files').files];if(!text&&!files.length){$('msg').textContent='Add some words or a photo first.';return;}
+$('post').disabled=true;try{const images=[],videos=[],ts=Date.now();let n=0;
+for(const f of files){n++;$('msg').textContent='Uploading '+n+' of '+files.length+'…';
+ if(f.type.startsWith('video/')){if(f.size>45e6)throw new Error('Video over 45 MB. Trim it and try again.');const ext=(f.name.split('.').pop()||'mp4').toLowerCase(),p='media/updates/'+ts+'-'+n+'.'+ext;await gh(p,{method:'PUT',body:JSON.stringify({message:'Update video',content:await fileB64(f),branch:'main'})});videos.push(p);}
+ else{const p='images/updates/'+ts+'-'+n+'.jpg';await gh(p,{method:'PUT',body:JSON.stringify({message:'Update photo',content:await fileB64(await shrink(f)),branch:'main'})});images.push(p);}}
+$('msg').textContent='Posting…';const d=new Date(),date=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const post={id:String(ts),date,time:d.toISOString(),text};if($('tag').value)post.tag=$('tag').value;if(images.length)post.images=images;if(videos.length)post.videos=videos;
+for(let a=0;a<3;a++){try{const j=await getJ();j.list.unshift(post);await putJ(j.list,j.sha,'New update');break;}catch(e){if(a==2)throw e;}}
+$('msg').textContent='Posted! Live in about a minute.';$('txt').value='';$('files').value='';$('th').innerHTML='';$('tag').value='';list();}
+catch(e){$('msg').textContent='Something went wrong ('+e.message+'). Nothing was lost; try again.';}$('post').disabled=false;};
+async function list(){try{const j=await getJ();$('list').innerHTML='';if(!j.list.length){$('list').innerHTML='<p class="sub">No posts yet.</p>';return;}
+j.list.slice(0,15).forEach(p=>{const el=document.createElement('div');el.className='post';el.innerHTML='<div class="m"></div><div class="t"></div>';el.querySelector('.m').textContent=p.date+(p.tag?' · '+p.tag:'')+((p.images||[]).length?' · '+p.images.length+' photo(s)':'')+((p.videos||[]).length?' · video':'');el.querySelector('.t').textContent=(p.text||'').slice(0,140);
+const b=document.createElement('button');b.className='ghost';b.textContent='Delete';b.onclick=async()=>{if(!confirm('Delete this post?'))return;b.textContent='Deleting…';const k=await getJ();await putJ(k.list.filter(x=>(x.id||x.time)!==(p.id||p.time)),k.sha,'Delete update');list();};el.appendChild(b);$('list').appendChild(el);});}catch(e){$('list').innerHTML='<p class="sub">Could not load posts.</p>';}}
+start();
+</script></body></html>
