@@ -38,7 +38,7 @@ if(!list.length){box.innerHTML='<p style="color:#a1a1a6">First memo coming soon.
 list.sort((a,b)=>(+b.id||0)-(+a.id||0)||b.date.localeCompare(a.date));
 for(const p of list){const el=document.createElement('article');el.className='post';
 const d=new Date(p.date+'T12:00:00');let h='<div class="meta">'+d.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})+(p.tag?'<span class="tag">'+p.tag+'</span>':'')+'</div>';
-if(p.text)h+='<p></p>';(p.images||[]).forEach(i=>h+='<img loading="lazy" alt="" src="'+i+'">');(p.videos||[]).forEach(v=>h+='<video controls playsinline preload="metadata" src="'+v+'"></video>');
+if(p.text)h+='<p></p>';(p.images||[]).forEach(i=>h+='<img loading="lazy" alt="" src="'+i+'">');(p.videos||[]).forEach(v=>h+='<video controls playsinline preload="metadata" src="'+v+'#t=0.5"></video>');
 el.innerHTML=h;if(p.text)el.querySelector('p').textContent=p.text;box.appendChild(el)}}).catch(()=>{});
 </script>
 </main><footer class="foot">© 2026 Coleman Customworks LLC · Twin City, Georgia</footer>
