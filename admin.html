@@ -11,15 +11,21 @@ button.ghost{background:none;color:#f5f5f7;border:1px solid #f5f5f766;padding:8p
 #msg{margin-top:14px;font-size:14px;min-height:20px}.thumbs{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.thumbs img{width:76px;height:76px;object-fit:cover;border-radius:10px}
 .post{border:1px solid #f5f5f71f;border-radius:14px;padding:12px;margin-top:10px;font-size:14px}.post .m{color:#a1a1a6;font-size:12px;margin-bottom:4px}
 a{color:#f5f5f7}
+.seg{display:flex;gap:6px;background:#141417;border-radius:24px;padding:4px;margin-bottom:22px}.seg button{flex:1;margin:0;background:none;color:#a1a1a6;padding:10px;font-weight:500}.seg button.on{background:#f5f5f7;color:#0e0e10}
 </style></head><body><div class="w">
 <div id="login" hidden><h1>Owner sign in</h1><p class="sub">Enter your posting key once. It stays on this device only.</p>
 <label>Posting key</label><input type="password" id="tok" autocomplete="current-password"><button id="save">Sign in</button><div id="lmsg" style="margin-top:12px;font-size:14px"></div></div>
-<div id="app" hidden><h1>Post a memo</h1><p class="sub">Goes live on your <a href="updates.html">Memos page</a> in about a minute.</p>
+<div id="app" hidden><div class="seg"><button id="mMemo" class="on">Memo</button><button id="mWork">Our Work</button></div>
+<div id="memo"><h1>Post a memo</h1><p class="sub">Goes live on your <a href="updates.html">Memos page</a> in about a minute.</p>
 <label>What's new?</label><textarea id="txt" placeholder="A thought, an announcement, or a note about the job…"></textarea>
 <label>Tag (optional)</label><select id="tag"><option value="">None</option><option>Job pics</option><option>Announcement</option><option>Thoughts</option><option>Before &amp; after</option></select>
 <label>Photos or video (optional)</label><input type="file" id="files" accept="image/*,video/*" multiple><div class="thumbs" id="th"></div>
 <button id="post">Post</button><div id="msg"></div>
-<h2 style="font-weight:500;font-size:20px;margin:36px 0 4px">Recent posts</h2><div id="list"></div>
+<h2 style="font-weight:500;font-size:20px;margin:36px 0 4px">Recent posts</h2><div id="list"></div></div>
+<div id="work" hidden><h1>Add to Our Work</h1><p class="sub">Shows at the top of your <a href="our-work.html">Our Work page</a> in about a minute.</p>
+<label>Caption</label><input type="text" id="wcap" placeholder="e.g. New black tin roof">
+<label>Photos and/or video</label><input type="file" id="wfiles" accept="image/*,video/*" multiple><div class="thumbs" id="wth"></div>
+<button id="wpost">Add to Our Work</button><div id="wmsg" style="margin-top:14px;font-size:14px;min-height:20px"></div></div>
 <button class="ghost" id="out">Sign out on this device</button></div>
 </div>
 <script>
@@ -50,5 +56,30 @@ catch(e){$('msg').textContent='Something went wrong ('+e.message+'). Nothing was
 async function list(){try{const j=await getJ();$('list').innerHTML='';if(!j.list.length){$('list').innerHTML='<p class="sub">No posts yet.</p>';return;}
 j.list.slice(0,15).forEach(p=>{const el=document.createElement('div');el.className='post';el.innerHTML='<div class="m"></div><div class="t"></div>';el.querySelector('.m').textContent=p.date+(p.tag?' · '+p.tag:'')+((p.images||[]).length?' · '+p.images.length+' photo(s)':'')+((p.videos||[]).length?' · video':'');el.querySelector('.t').textContent=(p.text||'').slice(0,140);
 const b=document.createElement('button');b.className='ghost';b.textContent='Delete';b.onclick=async()=>{if(!confirm('Delete this post?'))return;b.textContent='Deleting…';const k=await getJ();await putJ(k.list.filter(x=>(x.id||x.time)!==(p.id||p.time)),k.sha,'Delete update');list();};el.appendChild(b);$('list').appendChild(el);});}catch(e){$('list').innerHTML='<p class="sub">Could not load posts.</p>';}}
+
+const esc=t=>t.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function mode(w){$('work').hidden=!w;$('memo').hidden=w;$('mWork').className=w?'on':'';$('mMemo').className=w?'':'on';}
+$('mMemo').onclick=()=>mode(false);$('mWork').onclick=()=>mode(true);
+$('wfiles').onchange=()=>{$('wth').innerHTML='';[...$('wfiles').files].forEach(f=>{if(f.type.startsWith('image/')){const i=document.createElement('img');i.src=URL.createObjectURL(f);$('wth').appendChild(i);}else{const s=document.createElement('span');s.textContent='🎬 '+f.name;$('wth').appendChild(s);}});};
+function vposter(file){return new Promise(res=>{let done=false;const fin=b=>{if(!done){done=true;res(b);}};const v=document.createElement('video');v.muted=true;v.playsInline=true;v.preload='auto';v.src=URL.createObjectURL(file);
+v.onloadeddata=()=>{try{v.currentTime=Math.min(1.5,(v.duration||4)/4);}catch(e){fin(null);}};
+v.onseeked=()=>{try{const k=Math.min(1,720/Math.max(v.videoWidth,v.videoHeight)),c=document.createElement('canvas');c.width=v.videoWidth*k;c.height=v.videoHeight*k;c.getContext('2d').drawImage(v,0,0,c.width,c.height);c.toBlob(fin,'image/jpeg',.82);}catch(e){fin(null);}};
+v.onerror=()=>fin(null);setTimeout(()=>fin(null),10000);v.load();});}
+$('wpost').onclick=async()=>{const cap=$('wcap').value.trim(),files=[...$('wfiles').files];if(!cap){$('wmsg').textContent='Add a caption first.';return;}if(!files.length){$('wmsg').textContent='Pick at least one photo or video.';return;}
+$('wpost').disabled=true;try{const ts=Date.now();let n=0,figs='',vids='';const c=esc(cap);
+for(const f of files){n++;$('wmsg').textContent='Uploading '+n+' of '+files.length+'…';
+ if(f.type.startsWith('video/')){if(f.size>45e6)throw new Error('Video over 45 MB. Trim it and try again.');const ext=(f.name.split('.').pop()||'mp4').toLowerCase(),vp='media/work/'+ts+'-'+n+'.'+ext;
+  await gh(vp,{method:'PUT',body:JSON.stringify({message:'Our Work video',content:await fileB64(f),branch:'main'})});
+  let pa='';const pb=await vposter(f);if(pb){const pp='media/posters/work-'+ts+'-'+n+'.jpg';await gh(pp,{method:'PUT',body:JSON.stringify({message:'Our Work video thumbnail',content:await fileB64(pb),branch:'main'})});pa=' poster="'+pp+'"';}
+  vids+='<figure class="vid"><video controls playsinline preload="metadata"'+pa+' src="'+vp+(pa?'':'#t=0.5')+'"></video><figcaption>'+c+'</figcaption></figure>';}
+ else{const ip='images/work/'+ts+'-'+n+'.jpg';await gh(ip,{method:'PUT',body:JSON.stringify({message:'Our Work photo',content:await fileB64(await shrink(f)),branch:'main'})});
+  figs+='<figure><a href="'+ip+'"><img src="'+ip+'" alt="'+c+'" loading="lazy"></a><figcaption>'+c+'</figcaption></figure>';}}
+$('wmsg').textContent='Adding to the page…';
+for(let a=0;a<3;a++){try{const f=await gh('our-work.html?ref=main&t='+Date.now());let h=unb64(f.content);
+ if(figs){const g='<div class="grid">';if(h.indexOf(g)<0)throw new Error('page layout changed');h=h.replace(g,g+figs);}
+ if(vids){const i=h.indexOf('<figure class="vid">');if(i>=0)h=h.slice(0,i)+vids+h.slice(i);else{const j=h.indexOf('</div></main>');if(j<0)throw new Error('page layout changed');h=h.slice(0,j)+vids+h.slice(j);}}
+ await gh('our-work.html',{method:'PUT',body:JSON.stringify({message:'Our Work: '+cap,content:b64(h),sha:f.sha,branch:'main'})});break;}catch(e){if(a==2||e.message=='page layout changed')throw e;}}
+$('wmsg').textContent='Added! Live on Our Work in about a minute.';$('wcap').value='';$('wfiles').value='';$('wth').innerHTML='';}
+catch(e){$('wmsg').textContent='Something went wrong ('+e.message+'). Try again, or send it to Hark.';}$('wpost').disabled=false;};
 start();
 </script></body></html>
